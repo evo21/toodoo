@@ -5,13 +5,23 @@ require 'pry'
 
 module Toodoo
   class User < ActiveRecord::Base
+    has_many :lists
+  end
+
+  class List < ActiveRecord::Base
+    belongs_to :user
+    has_many :tasks
+  end
+
+  class Task < ActiveRecord::Base
+    belongs_to :list
   end
 end
 
 class TooDooApp
   def initialize
     @user = nil
-    @todos = nil
+    @lists = nil
     @show_done = nil
   end
 
@@ -24,7 +34,7 @@ class TooDooApp
 
   def login
     choose do |menu|
-      menu.prompt = "Please choose an account: "
+      menu.prompt = "Please choose an account - enter Username: "
 
       Toodoo::User.find_each do |u|
         menu.choice(u.name, "Login as #{u.name}.") { @user = u }
@@ -50,13 +60,16 @@ class TooDooApp
     end
   end
 
-  def new_todo_list
-    # TODO: This should create a new todo list by getting input from the user.
-    # The user should not have to tell you their id.
-    # Create the todo list in the database and update the @todos variable.
+  def new_list
+    say("Creating a new ToDo List/Category: ie. 'Groceries', 'School'")
+    
+    name = ask("List Category or Title of your new ToDo List-(250 characters or less)?") { |q| q.validate = /\A\w+\Z/ }
+    @user.lists.create(:name => name)
+    say("Thanks #{@user.name}! Let's add some Tasks for this List: ")
+    binding.pry
   end
 
-  def pick_todo_list
+  def pick_list
     choose do |menu|
       # TODO: This should get get the todo lists for the logged in user (@user).
       # Iterate over them and add a menu.choice line as seen under the login method's
@@ -64,12 +77,12 @@ class TooDooApp
 
       menu.choice(:back, "Just kidding, back to the main menu!") do
         say "You got it!"
-        @todos = nil
+        @lists = nil
       end
     end
   end
 
-  def delete_todo_list
+  def delete_list
     # TODO: This should confirm that the user wants to delete the todo list.
     # If they do, it should destroy the current todo list and set @todos to nil.
   end
@@ -120,15 +133,15 @@ class TooDooApp
         end
 
         # We're logged in. Do we have a todo list to work on?
-        if @user && !@todos
+        if @user && !@lists
           menu.choice(:delete_account, "Delete the current user account.") { delete_user }
-          menu.choice(:new_list, "Create a new todo list.") { new_todo_list }
-          menu.choice(:pick_list, "Work on an existing list.") { pick_todo_list }
-          menu.choice(:remove_list, "Delete a todo list.") { delete_todo_list }
+          menu.choice(:new_list, "Create a new todo list.") { new_list }
+          menu.choice(:pick_list, "Work on an existing list.") { pick_list }
+          menu.choice(:remove_list, "Delete a todo list.") { delete_list }
         end
 
         # Let's work on some todos!
-        if @todos
+        if @lists
           menu.choice(:new_task, "Add a new task.") { new_task }
           menu.choice(:mark_done, "Mark a task finished.") { mark_done }
           menu.choice(:move_date, "Change a task's due date.") { change_due_date }
@@ -137,7 +150,7 @@ class TooDooApp
           menu.choice(:show_overdue, "Show a list of task's that are overdue, oldest first.") { show_overdue }
           menu.choice(:back, "Go work on another Toodoo list!") do
             say "You got it!"
-            @todos = nil
+            @lists = nil
           end
         end
 
@@ -151,3 +164,7 @@ binding.pry
 
 todos = TooDooApp.new
 todos.run
+
+
+# rake db:migrate
+# bundle exec ruby lib/toodoo.rb
