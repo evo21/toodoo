@@ -27,7 +27,7 @@ class TooDooApp
 
   def new_user
     say("Creating a new user:")
-    name = ask("Username?") { |q| q.validate = /\A\w+\Z/ }
+    name = ask("Username?") { |q| q.validate = /\A\w+|\Z/ }
     @user = Toodoo::User.create(:name => name)
     say("We've created your account and logged you in. Thanks #{@user.name}!")
   end
@@ -49,12 +49,12 @@ class TooDooApp
 
   def delete_user
     choices = 'yn'
-    delete = ask("Are you *sure* you want to stop using TooDoo?") do |q|
+    delete = ask("Are you *sure* you want to stop using TooDoo? y/n") do |q|
       q.validate =/\A[#{choices}]\Z/
       q.character = true
-      q.confirm = true
     end
     if delete == 'y'
+      say("User: **#{@user.name}** Deleted!")
       @user.destroy
       @user = nil
     end
@@ -65,46 +65,65 @@ class TooDooApp
     
     name = ask("List Category or Title of your new ToDo List-(250 characters or less)?") { |q| q.validate = /\A\w+\Z/ }
     @list = Toodoo::List.create(:name => name, :user_id => @user.id)
-
-    #@user.lists.create(:name => name)
     say("Thanks #{@user.name}! Let's add some Tasks for this List: ")
 
   end
 
   def pick_list
     choose do |menu|
-      # TODO: This should get get the todo lists for the logged in user (@user).
-      # Iterate over them and add a menu.choice line as seen under the login method's
-      # find_each call. The menu choice block should set @todos to the todo list.
-
-      menu.choice(:back, "Just kidding, back to the main menu!") do
+      menu.prompt = "Choose a Category/ToDo List: "
+      @user.lists.find_each do |l|
+        menu.choice(l.name, "Choose List: #{l.name}.") { @list = l }
+        end
+      menu.choice(:back, "Just kidding, back to main menu!") do
         say "You got it!"
-        @lists = nil
+        @list = nil
       end
     end
   end
 
   def delete_list
-    # TODO: This should confirm that the user wants to delete the todo list.
-    # If they do, it should destroy the current todo list and set @todos to nil.
+    choose do |menu|
+      menu.prompt = "Choose a Category/ToDo List to Delete: "
+      @user.lists.find_each do |l|
+        menu.choice(l.name, "Choose List: #{l.name}.") { @list = l }
+        end
+      menu.choice(:back, "Just kidding, back to main menu!") do
+        say "You got it!"
+        @list =  nil
+        break
+      end
+    end
+      choices = 'yn'
+      delete = ask("Are you SURE you want Delete the **#{@list.name}** ToDo List?") do |q|
+      q.validate =/\A[#{choices}]\Z/
+      q.character = true
+    end
+    if delete == 'y'
+      say("**#{@list.name}*** List Deleted!")
+      @list.destroy
+      @list = nil
+    else
+      say "Returning to previous menu..."
+      @list = nil
+    end
   end
 
   def get_and_save_due_date(task)
     task.due_date = ask("When should this task be completed?") do |q|
       q.default = Date.today.to_s;
       q.validate = lambda { |p| Date.parse(p) >= Date.today }
-      q.responses[:not_valid] = "Enter a date greater than or equal to today"
+      q.responses[:not_valid] = "Enter a date of today or later"
     end
     task.save
   end
   
   def new_task
-    say("Creating some ToDo's as part of the #{'@list'} List: ")    
-    name = ask("What Tasks would you like to add to this current ToDo List?")
-    binding.pry
+    say("Creating some ToDo's as part of your current List: ")    
+    name = ask("What Task(s) to add to the **#{@list.name}** List?")
     newtask = @list.tasks.create(:name => name)
     choices = 'yn'
-    duedate = ask("Thanks #{@user.name}! Is there a Due Date for this Task?") { |q| q.validate = /\A[#{choices}]\Z/ }
+    duedate = ask("Thanks #{@user.name}! Is there a Due Date for this Task? y/n") { |q| q.validate = /\A[#{choices}]\Z/ }
     if duedate == 'y'
       get_and_save_due_date(newtask)
     end
@@ -138,7 +157,6 @@ class TooDooApp
   end
 
   def run
-    binding.pry
     puts "Welcome to your personal TooDoo app."
     loop do
       choose do |menu|
@@ -153,14 +171,16 @@ class TooDooApp
 
         # We're logged in. Do we have a todo list selected to work on?
         if @user && !@list
+          say("User: #{@user.name}:")
           menu.choice(:delete_account, "Delete the current user account.") { delete_user }
-          menu.choice(:new_list, "Create a new todo list.") { new_list }
-          menu.choice(:pick_list, "Work on an existing list.") { pick_list }
-          menu.choice(:remove_list, "Delete a todo list.") { delete_list }
+          menu.choice(:new_list, "Create a new ToDo list.") { new_list }
+          menu.choice(:pick_list, "Work on an existing ToDo list.") { pick_list }
+          menu.choice(:remove_list, "Delete an Existing ToDo list.") { delete_list }          
         end
 
         # Let's work on some todos!
         if @user && @list
+          say("#{@user.name}'s #{@list.name} ToDo List:")
           menu.choice(:new_task, "Add a new task.") { new_task }
           menu.choice(:mark_done, "Mark a task finished.") { mark_done }
           menu.choice(:move_date, "Change a task's due date.") { change_due_date }
@@ -169,7 +189,7 @@ class TooDooApp
           menu.choice(:show_overdue, "Show a list of task's that are overdue, oldest first.") { show_overdue }
           menu.choice(:back, "Go work on another Toodoo list!") do
             say "You got it!"
-            @lists = nil
+            @list = nil
           end
         end
 
@@ -178,8 +198,6 @@ class TooDooApp
     end
   end
 end
-
-#binding.pry
 
 todos = TooDooApp.new
 todos.run
