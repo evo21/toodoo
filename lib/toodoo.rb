@@ -64,9 +64,11 @@ class TooDooApp
     say("Creating a new ToDo List/Category: ie. 'Groceries', 'School'")
     
     name = ask("List Category or Title of your new ToDo List-(250 characters or less)?") { |q| q.validate = /\A\w+\Z/ }
-    @user.lists.create(:name => name)
+    @list = Toodoo::List.create(:name => name, :user_id => @user.id)
+
+    #@user.lists.create(:name => name)
     say("Thanks #{@user.name}! Let's add some Tasks for this List: ")
-    binding.pry
+
   end
 
   def pick_list
@@ -87,9 +89,25 @@ class TooDooApp
     # If they do, it should destroy the current todo list and set @todos to nil.
   end
 
+  def get_and_save_due_date(task)
+    task.due_date = ask("When should this task be completed?") do |q|
+      q.default = Date.today.to_s;
+      q.validate = lambda { |p| Date.parse(p) >= Date.today }
+      q.responses[:not_valid] = "Enter a date greater than or equal to today"
+    end
+    task.save
+  end
+  
   def new_task
-    # TODO: This should create a new task on the current user's todo list.
-    # It must take any necessary input from the user. A due date is optional.
+    say("Creating some ToDo's as part of the #{'@list'} List: ")    
+    name = ask("What Tasks would you like to add to this current ToDo List?")
+    binding.pry
+    newtask = @list.tasks.create(:name => name)
+    choices = 'yn'
+    duedate = ask("Thanks #{@user.name}! Is there a Due Date for this Task?") { |q| q.validate = /\A[#{choices}]\Z/ }
+    if duedate == 'y'
+      get_and_save_due_date(newtask)
+    end
   end
 
   ## NOTE: For the next 3 methods, make sure the change is saved to the database.
@@ -120,6 +138,7 @@ class TooDooApp
   end
 
   def run
+    binding.pry
     puts "Welcome to your personal TooDoo app."
     loop do
       choose do |menu|
@@ -132,8 +151,8 @@ class TooDooApp
           menu.choice(:login, "Login with an existing account.") { login }
         end
 
-        # We're logged in. Do we have a todo list to work on?
-        if @user && !@lists
+        # We're logged in. Do we have a todo list selected to work on?
+        if @user && !@list
           menu.choice(:delete_account, "Delete the current user account.") { delete_user }
           menu.choice(:new_list, "Create a new todo list.") { new_list }
           menu.choice(:pick_list, "Work on an existing list.") { pick_list }
@@ -141,7 +160,7 @@ class TooDooApp
         end
 
         # Let's work on some todos!
-        if @lists
+        if @user && @list
           menu.choice(:new_task, "Add a new task.") { new_task }
           menu.choice(:mark_done, "Mark a task finished.") { mark_done }
           menu.choice(:move_date, "Change a task's due date.") { change_due_date }
@@ -160,7 +179,7 @@ class TooDooApp
   end
 end
 
-binding.pry
+#binding.pry
 
 todos = TooDooApp.new
 todos.run
