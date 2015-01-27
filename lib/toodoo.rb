@@ -119,8 +119,8 @@ class TooDooApp
   end
   
   def new_task
-    say("Creating some ToDo's as part of your current List: ")    
-    name = ask("What Task(s) to add to the **#{@list.name}** List?")
+    say("Creating some ToDo's for your List:")    
+    name = ask("**#{@list.name}** What Task(s) to add?")
     newtask = @list.tasks.create(:name => name)
     choices = 'yn'
     duedate = ask("Thanks #{@user.name}! Is there a Due Date for this Task? y/n") { |q| q.validate = /\A[#{choices}]\Z/ }
@@ -130,10 +130,22 @@ class TooDooApp
   end
 
   ## NOTE: For the next 3 methods, make sure the change is saved to the database.
-  def mark_done
-    # TODO: This should display the todos on the current list in a menu
-    # similarly to pick_todo_list. Once they select a todo, the menu choice block
-    # should update the todo to be completed.
+  def show_tasks_and_mark_done
+    task = choose do |menu|
+      menu.prompt = "Tasks for #{@user.name}'s **#{@list.name}** ToDo List:\nChoose Task to mark **Completed**:"
+      @list.tasks.where(done: false).find_each do |t|
+        menu.choice(t.name, "XXXXXX") {@task = t}
+        end
+      menu.choice(:back, "Just kidding, back to main menu!") do
+        say "You got it!"
+        @task = nil
+        break
+      end
+    end
+    say("**#{@task.name}*** marked Done!")
+    @task.done = true
+    task.save
+    @task = nil
   end
 
   def change_due_date
@@ -160,33 +172,36 @@ class TooDooApp
     puts "Welcome to your personal TooDoo app."
     loop do
       choose do |menu|
-        menu.layout = :menu_only
-        menu.shell = true
+        #menu.layout = :menu_only
+        #menu.shell = true
 
         # Are we logged in yet?
+
+        binding.pry
+
         unless @user
-          menu.choice(:new_user, "Create a new user.") { new_user }
-          menu.choice(:login, "Login with an existing account.") { login }
+          menu.choice("Create a new user.", :new_user) { new_user }
+          menu.choice("Login with an existing account.", :login) { login }
         end
 
         # We're logged in. Do we have a todo list selected to work on?
         if @user && !@list
           say("User: #{@user.name}:")
-          menu.choice(:delete_account, "Delete the current user account.") { delete_user }
-          menu.choice(:new_list, "Create a new ToDo list.") { new_list }
-          menu.choice(:pick_list, "Work on an existing ToDo list.") { pick_list }
-          menu.choice(:remove_list, "Delete an Existing ToDo list.") { delete_list }          
+          menu.choice("Delete the current user account.", :delete_account) { delete_user }
+          menu.choice("Create a new ToDo list.", :new_list) { new_list }
+          menu.choice("Work on an existing ToDo list.", :pick_list) { pick_list }
+          menu.choice("Delete an Existing ToDo list.", :remove_list) { delete_list }
         end
 
         # Let's work on some todos!
         if @user && @list
           say("#{@user.name}'s #{@list.name} ToDo List:")
-          menu.choice(:new_task, "Add a new task.") { new_task }
-          menu.choice(:mark_done, "Mark a task finished.") { mark_done }
-          menu.choice(:move_date, "Change a task's due date.") { change_due_date }
-          menu.choice(:edit_task, "Update a task's description.") { edit_task }
-          menu.choice(:show_done, "Toggle display of tasks you've finished.") { @show_done = !!@show_done }
-          menu.choice(:show_overdue, "Show a list of task's that are overdue, oldest first.") { show_overdue }
+          menu.choice("Add a new task.", :new_task) { new_task }
+          menu.choice("Mark a task finished.", :mark_done) { show_tasks_and_mark_done }
+          menu.choice("Change a task's due date.", :move_date) { change_due_date }
+          menu.choice("Update a task's description.", :edit_task) { edit_task }
+          menu.choice("Toggle display of tasks you've finished.", :show_done) { @show_done = !!@show_done }
+          menu.choice("Show a list of task's that are overdue, oldest first.", :show_overdue) { show_overdue }
           menu.choice(:back, "Go work on another Toodoo list!") do
             say "You got it!"
             @list = nil
